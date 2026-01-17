@@ -1,0 +1,3207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>智慧白板</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+            padding-bottom: 70px;
+            overflow-x: hidden;
+        }
+        
+        /* 启动画面 */
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        
+        .splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .splash-logo {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .splash-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(67, 97, 238, 0.15);
+        }
+        
+        .splash-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #4361ee, #4cc9f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 2px 10px rgba(67, 97, 238, 0.1);
+        }
+        
+        .splash-subtitle {
+            font-size: 1rem;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .splash-loading {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .splash-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(76, 201, 240, 0.1);
+            border-top: 4px solid #4cc9f0;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        /* 桌面端警告 */
+        .desktop-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+            color: white;
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .desktop-warning h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #4cc9f0;
+        }
+        
+        .desktop-warning p {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #a0a0c0;
+        }
+        
+        /* 容器样式 */
+        .container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 15px;
+            display: none;
+        }
+        
+        .container.ready {
+            display: block;
+        }
+        
+        /* 头部 */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .app-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .app-version {
+            font-size: 0.8rem;
+            color: #888;
+            background: #f0f0f0;
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+        
+        /* 浏览器式标签页 */
+        .browser-tabs {
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        
+        .tabs-bar {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            overflow-x: auto;
+            padding: 0 10px;
+            scrollbar-width: none;
+        }
+        
+        .tabs-bar::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .tab-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            margin-right: 4px;
+            min-width: 120px;
+            max-width: 180px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        
+        .tab-item:not(.active):hover {
+            background: #f5f5f5;
+        }
+        
+        .tab-item.active {
+            background: linear-gradient(135deg, #4361ee, #3a56d4);
+            color: white;
+            border-bottom: 2px solid white;
+            margin-bottom: -1px;
+            z-index: 2;
+            box-shadow: 0 2px 8px rgba(67, 97, 238, 0.3);
+        }
+        
+        .tab-item.active .tab-name {
+            color: white;
+            font-weight: 500;
+        }
+        
+        .tab-item.active .tab-close {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+        
+        .tab-item.active .tab-close:hover {
+            background: rgba(255, 255, 255, 0.5);
+            color: white;
+        }
+        
+        .tab-content-container {
+            background: white;
+            position: relative;
+            min-height: 400px;
+        }
+        
+        .tab-preview-container {
+            position: relative;
+            display: none;
+            min-height: 400px;
+        }
+        
+        .tab-preview-container.active {
+            display: block;
+        }
+        
+        .tab-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        
+        .tab-close {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: #666;
+            margin-left: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .tab-close:hover {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .add-tab-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(90deg, #4361ee, #4cc9f0);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        .add-tab-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(67, 97, 238, 0.2);
+        }
+        
+        /* 页面容器 */
+        .page-container {
+            display: none;
+            min-height: calc(100vh - 140px);
+        }
+        
+        .page-container.active {
+            display: block;
+        }
+        
+        /* 首页样式 */
+        .upload-section {
+            background: white;
+            border-radius: 16px;
+            padding: 25px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            border: 2px dashed #4cc9f0;
+        }
+        
+        .upload-icon {
+            font-size: 3.5rem;
+            color: #4cc9f0;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text h3 {
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .upload-text p {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        /* 统一的文件选择按钮 */
+        .file-select-btn {
+            background: linear-gradient(90deg, #4361ee, #4cc9f0);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(67, 97, 238, 0.2);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .file-select-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.3);
+        }
+        
+        .file-select-btn.hbx-mode {
+            background: linear-gradient(90deg, #38b000, #70e000);
+            box-shadow: 0 4px 15px rgba(56, 176, 0, 0.2);
+        }
+        
+        .file-select-btn.hbx-mode:hover {
+            box-shadow: 0 6px 20px rgba(56, 176, 0, 0.3);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+            text-align: left;
+            border-left: 4px solid #4cc9f0;
+        }
+        
+        .file-info-icon {
+            font-size: 1.2rem;
+            color: #4cc9f0;
+            margin-right: 10px;
+        }
+        
+        /* 图片预览区域 */
+        .preview-section {
+            display: none;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+        
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .preview-title {
+            font-size: 1.2rem;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .preview-count {
+            font-size: 0.9rem;
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+        
+        .thumbnail-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .thumbnail-item {
+            border-radius: 10px;
+            overflow: hidden;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .thumbnail-item.active {
+            border-color: #4361ee;
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+        
+        .thumbnail-img-container {
+            height: 100px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .thumbnail-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .thumbnail-index {
+            text-align: center;
+            padding: 8px 0;
+            font-size: 0.85rem;
+            color: #666;
+            background: white;
+        }
+        
+        /* 预览控制栏 */
+        .preview-toolbar {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 15px;
+            border-radius: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+        
+        .preview-toolbar-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .preview-toolbar-btn:hover {
+            background: #e0e0e0;
+            transform: scale(1.1);
+        }
+        
+        .preview-toolbar-btn.presentation {
+            background: linear-gradient(90deg, #4361ee, #4cc9f0);
+            color: white;
+        }
+        
+        .preview-toolbar-btn.download {
+            background: linear-gradient(90deg, #38b000, #70e000);
+            color: white;
+        }
+        
+        /* 放映模式 */
+        .presentation-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+        }
+        
+        .presentation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid #333;
+        }
+        
+        .presentation-title {
+            font-size: 1.1rem;
+            color: #fff;
+        }
+        
+        .presentation-controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .presentation-controls button {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .presentation-controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .presentation-controls button.active {
+            background: #4361ee;
+        }
+        
+        .presentation-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .presentation-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+        
+        /* 横屏模式 */
+        .presentation-image.landscape {
+            transform: rotate(90deg);
+            max-width: 90vh;
+            max-height: 90vw;
+        }
+        
+        .presentation-nav {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+        }
+        
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+        
+        .canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: none;
+        }
+        
+        .drawing-canvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        
+        /* 画笔控制面板 */
+        .brush-controls {
+            position: absolute;
+            top: 70px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 10px;
+            padding: 15px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 2;
+            min-width: 180px;
+            border: 1px solid #444;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .brush-controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #444;
+        }
+        
+        .brush-controls-title {
+            font-size: 0.95rem;
+            color: #fff;
+            font-weight: 500;
+        }
+        
+        .close-brush-controls {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.1rem;
+            cursor: pointer;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .close-brush-controls:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        
+        .brush-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+        
+        .brush-control label {
+            font-size: 0.85rem;
+            color: #fff;
+        }
+        
+        .brush-control input {
+            width: 100px;
+        }
+        
+        .color-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            margin-bottom: 5px;
+        }
+        
+        .color-option {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-option.selected {
+            border-color: white;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+            transform: scale(1.1);
+        }
+        
+        .brush-controls-footer {
+            display: flex;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        
+        .clear-btn {
+            background: #f72585;
+            color: white;
+            border: none;
+            padding: 8px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex: 1;
+            font-size: 0.85rem;
+        }
+        
+        .clear-btn:hover {
+            background: #ff006e;
+        }
+        
+        .close-panel-btn {
+            background: #4361ee;
+            color: white;
+            border: none;
+            padding: 8px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex: 1;
+            font-size: 0.85rem;
+        }
+        
+        .close-panel-btn:hover {
+            background: #3a56d4;
+        }
+        
+        .image-counter {
+            color: #fff;
+            font-size: 1rem;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 12px;
+            border-radius: 15px;
+            z-index: 1;
+        }
+        
+        /* 活动页面样式 */
+        .activity-container {
+            width: 100%;
+            height: calc(100vh - 180px);
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .activity-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        /* 我的页面样式 */
+        .profile-container {
+            background: white;
+            border-radius: 16px;
+            padding: 25px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4cc9f0, #4361ee);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+        
+        .profile-info h3 {
+            font-size: 1.3rem;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .profile-info p {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .menu-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .menu-item:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+        }
+        
+        .menu-item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .menu-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        .menu-icon.update {
+            background: linear-gradient(135deg, #4cc9f0, #4361ee);
+        }
+        
+        .menu-icon.exit {
+            background: linear-gradient(135deg, #f72585, #7209b7);
+        }
+        
+        .menu-text h4 {
+            font-size: 1rem;
+            color: #333;
+            margin-bottom: 3px;
+        }
+        
+        .menu-text p {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .menu-arrow {
+            color: #ccc;
+            font-size: 1.2rem;
+        }
+        
+        /* 底部导航栏 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+            z-index: 100;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex: 1;
+            height: 100%;
+        }
+        
+        .nav-item.active {
+            color: #4361ee;
+        }
+        
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        .nav-text {
+            font-size: 0.75rem;
+        }
+        
+        /* 加载动画 */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+            font-size: 1.1rem;
+        }
+        
+        .loading-spinner {
+            border: 4px solid rgba(76, 201, 240, 0.1);
+            border-top: 4px solid #4cc9f0;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 对话框样式 */
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .dialog {
+            background: white;
+            border-radius: 16px;
+            width: 85%;
+            max-width: 400px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .dialog-header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .dialog-title {
+            font-size: 1.3rem;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .dialog-content {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .dialog-actions {
+            display: flex;
+            border-top: 1px solid #eee;
+        }
+        
+        .dialog-btn {
+            flex: 1;
+            padding: 16px;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .dialog-btn.cancel {
+            color: #666;
+            border-right: 1px solid #eee;
+        }
+        
+        .dialog-btn.cancel:hover {
+            background: #f8f9fa;
+        }
+        
+        .dialog-btn.confirm {
+            color: #4361ee;
+            font-weight: 500;
+        }
+        
+        .dialog-btn.confirm:hover {
+            background: #f8f9fa;
+        }
+        
+        /* 响应式调整 */
+        @media (min-width: 768px) {
+            .desktop-warning {
+                display: flex;
+            }
+            
+            .container {
+                display: none;
+            }
+            
+            .bottom-nav {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 767px) {
+            .desktop-warning {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 360px) {
+            .thumbnail-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .tab-item {
+                min-width: 100px;
+                max-width: 140px;
+            }
+        }
+        
+        /* 空状态提示 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            display: none;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #ddd;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #666;
+        }
+        
+        .empty-state p {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        /* 标签页内容区域 */
+        .tab-content-wrapper {
+            padding: 20px;
+            position: relative;
+        }
+        
+        /* 浏览器式标签页管理 */
+        .tabs-manager {
+            display: block;
+        }
+        
+        .no-tabs-message {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+        
+        .no-tabs-message i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #ccc;
+        }
+        
+        .no-tabs-message h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+        
+        .no-tabs-message p {
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <!-- 启动画面 -->
+    <div class="splash-screen" id="splashScreen">
+        <div class="splash-logo">
+            <img src="https://longsstudio.github.io/zhbbtb.png" alt="智慧白板" onerror="this.style.display='none'; this.parentNode.innerHTML='<i class=\"fas fa-chalkboard-teacher\" style=\"font-size:80px;color:#4cc9f0\"></i>
+        </div>
+        <div class="splash-title">智慧白板</div>
+        <div class="splash-subtitle">基于Longs Studio团队制作</div>
+        <div class="splash-loading">
+            <div class="splash-spinner"></div>
+            <div>正在加载...</div>
+        </div>
+    </div>
+    
+    <!-- 桌面端警告 -->
+    <div class="desktop-warning" id="desktopWarning">
+        <h2>请使用手机访问</h2>
+        <p>此应用专为移动设备设计，请在手机浏览器中打开。</p>
+        <p>如果您正在使用手机，请确保浏览器已切换到移动端模式。</p>
+    </div>
+    
+    <!-- 应用主容器 -->
+    <div class="container" id="mainContainer">
+        <!-- 应用头部 -->
+        <div class="app-header">
+            <div class="app-title" id="appTitle">智慧白板</div>
+            <div class="app-version" id="appVersion">版本 1.1</div>
+        </div>
+        
+        <!-- 首页 - 浏览器式标签页 -->
+        <div class="page-container active" id="homePage">
+            <!-- 无标签页时的提示 -->
+            <div class="no-tabs-message" id="noTabsMessage">
+                <i class="fas fa-folder-open"></i>
+                <h3>暂无标签页</h3>
+                <p>点击下方按钮创建一个新标签页</p>
+                <button class="file-select-btn" id="createFirstTabBtn" style="margin-top: 20px;">
+                    <i class="fas fa-plus"></i> 创建新标签页
+                </button>
+            </div>
+            
+            <!-- 浏览器式标签页容器 -->
+            <div class="browser-tabs" id="browserTabs">
+                <!-- 标签页栏 -->
+                <div class="tabs-bar" id="tabsBar">
+                    <!-- 标签页将通过JS动态添加 -->
+                </div>
+                
+                <!-- 标签页内容容器 -->
+                <div class="tab-content-container" id="tabContentContainer">
+                    <!-- 标签页内容将通过JS动态添加 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 活动页面 -->
+        <div class="page-container" id="activityPage">
+            <div class="activity-container">
+                <iframe class="activity-iframe" id="activityIframe" src="about:blank"></iframe>
+            </div>
+        </div>
+        
+        <!-- 我的页面 -->
+        <div class="page-container" id="profilePage">
+            <div class="profile-container">
+                <div class="profile-header">
+                    <div class="profile-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="profile-info">
+                        <h3>LONGS用户</h3>
+                        <p>longs文件查看与放映工具</p>
+                    </div>
+                </div>
+                
+                <div class="menu-list">
+                    <div class="menu-item" id="checkUpdateItem">
+                        <div class="menu-item-left">
+                            <div class="menu-icon update">
+                                <i class="fas fa-sync-alt"></i>
+                            </div>
+                            <div class="menu-text">
+                                <h4>检查更新</h4>
+                                <p>检查新版本并更新</p>
+                            </div>
+                        </div>
+                        <div class="menu-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="menu-item" id="exitAppItem">
+                        <div class="menu-item-left">
+                            <div class="menu-icon exit">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </div>
+                            <div class="menu-text">
+                                <h4>退出软件</h4>
+                                <p>关闭应用程序</p>
+                            </div>
+                        </div>
+                        <div class="menu-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 全屏放映模式 -->
+        <div class="presentation-container" id="presentationContainer">
+            <div class="presentation-header">
+                <div class="presentation-title">放映模式 - <span id="currentImageTitle">图片 1</span></div>
+                <div class="presentation-controls">
+                    <button id="brushToggleBtn" title="画笔工具">
+                        <i class="fas fa-paint-brush"></i>
+                    </button>
+                    <button id="landscapeToggleBtn" title="横屏显示">
+                        <i class="fas fa-rotate-right"></i>
+                    </button>
+                    <button id="prevBtn">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button id="nextBtn">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button id="downloadCurrentBtn" title="下载当前图片">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button id="exitPresentationBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="presentation-body">
+                <img class="presentation-image" id="presentationImage" src="" alt="放映图片">
+                
+                <div class="canvas-container" id="canvasContainer">
+                    <canvas class="drawing-canvas" id="drawingCanvas"></canvas>
+                </div>
+                
+                <div class="brush-controls" id="brushControls">
+                    <div class="brush-controls-header">
+                        <div class="brush-controls-title">画笔设置</div>
+                        <button class="close-brush-controls" id="closeBrushControls" title="关闭面板">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="brush-control">
+                        <label>画笔大小:</label>
+                        <input type="range" id="brushSize" min="1" max="20" value="5">
+                    </div>
+                    
+                    <div class="brush-control">
+                        <label>画笔颜色:</label>
+                    </div>
+                    
+                    <div class="color-palette" id="colorPalette">
+                        <!-- 颜色选项将通过JS动态添加 -->
+                    </div>
+                    
+                    <div class="brush-controls-footer">
+                        <button class="clear-btn" id="clearCanvas">清除</button>
+                        <button class="close-panel-btn" id="closePanelBtn">关闭面板</button>
+                    </div>
+                </div>
+                
+                <div class="presentation-nav">
+                    <button class="nav-btn" id="presentationPrevBtn">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="nav-btn" id="downloadNavBtn" title="下载当前图片">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="nav-btn" id="presentationNextBtn">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                
+                <div class="image-counter" id="imageCounter">1 / 0</div>
+            </div>
+        </div>
+        
+        <!-- 底部导航栏 -->
+        <nav class="bottom-nav">
+            <div class="nav-item active" id="navHome">
+                <div class="nav-icon">
+                    <img src="https://longsstudio.github.io/sy.png" alt="首页" style="width: 24px; height: 24px;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEwIDIwaDZ2LTZoLTR2LTRoNHYtMmgtNnY2aDR2NGgtNnoiIGZpbGw9IiM0MzYxZWUiLz48L3N2Zz4='">
+                </div>
+                <div class="nav-text">首页</div>
+            </div>
+            
+            <div class="nav-item" id="navActivity">
+                <div class="nav-icon">
+                    <img src="https://longsstudio.github.io/hd.png" alt="活动" style="width: 24px; height: 24px;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40ODcgMiAyIDYuNDg3IDIgMTJzNC40ODcgMTAgMTAgMTAgMTAtNC40ODcgMTAtMTBTMTcuNTEzIDIgMTIgMnptMCAxOHMtOC01LjM3MyA4LTEwVjVjLTMuOTc1IDAtOCA1LjA3My04IDEwIDAgNC4wMjUgMTAgOCAxMHptNS01Yy0uNTUyIDAtMS0uNDQ3LTEtMXMuNDQ4LTEgMS0xIDEgLjQ0NyAxIDEtLjQ0OCAxLTEgMXoiIGZpbGw9IiM0MzYxZWUiLz48L3N2Zz4='">
+                </div>
+                <div class="nav-text">活动</div>
+            </div>
+            
+            <div class="nav-item" id="navProfile">
+                <div class="nav-icon">
+                    <img src="https://longsstudio.github.io/wd.png" alt="我的" style="width: 24px; height: 24px;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40NzkgMiAyIDYuNDc5IDIgMTJzNC40NzkgMTAgMTAgMTAgMTAtNC40NzkgMTAtMTBTMTcuNTIxIDIgMTIgMnptMCAyYzIuMjEgMCA0IDIuNjkxIDQgNnMtMS43OSA2LTQgNi00LTYuNjkxLTQtNiAxLjc5LTYgNC02em0wIDkuNjI1YzIuMjE4IDAgNCAxLjExMyA0IDIuMzc1cy0xLjc4MiAyLjM3NS00IDIuMzc1LTQtMS4xMTMtNC0yLjM3NSAxLjc4Mi0yLjM3NSA0LTIuMzc1em0wIDUuMzc1YzQuNDE1IDAgOC0xLjc5MSA4LTQgMC0xLjU5MS0xLjM3LTMtMy40NjctMy42MDQuNzE2LS4zODcgMS4yNjYtLjg5NiAxLjY2Ny0xLjUtLjE3NS0uMDkyLS4zNTgtLjE3OS0uNTQ0LS4yNjYuODY3LS4yMTcgMS42MDQtLjYwMyAyLjEyNy0xLjEwNUMxOC4xNSAxNi4xMDIgMTYuMjIxIDE3IDE0IDE3Yy0yLjIyMSAwLTQuMTUtLjg5OC01LjYxOC0yLjM2NS0uNTIzLjUwMi0xLjI2Ljg4OC0yLjEyNyAxLjEwNS0uMTg2LjA4Ny0uMzcuMTc0LS41NDQuMjY2LjQwMS42MDQuOTUxMS4xMTMgMS42NjcgMS41QzUuMzcgMTcgMTIgMTcgMTIgMTd6IiBmaWxsPSIjNDM2MWVlIi8+PC9zdmc+';">
+                </div>
+                <div class="nav-text">我的</div>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- 对话框 -->
+    <div class="dialog-overlay" id="dialogOverlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <div class="dialog-title" id="dialogTitle">提示</div>
+            </div>
+            <div class="dialog-content" id="dialogContent">
+                对话框内容
+            </div>
+            <div class="dialog-actions">
+                <button class="dialog-btn cancel" id="dialogCancel">取消</button>
+                <button class="dialog-btn confirm" id="dialogConfirm">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        console.log('智慧白板应用开始加载...');
+        
+        // 检测是否为移动设备
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        // 检测是否为HBuilderX 5+APP环境
+        function isHBuilderX() {
+            return window.plus && plus.runtime && plus.runtime.appid;
+        }
+        
+        // 隐藏启动画面
+        function hideSplashScreen() {
+            const splashScreen = document.getElementById('splashScreen');
+            if (splashScreen) {
+                splashScreen.classList.add('hidden');
+            }
+            
+            const mainContainer = document.getElementById('mainContainer');
+            if (mainContainer) {
+                mainContainer.classList.add('ready');
+            }
+            
+            if (!isMobileDevice()) {
+                const warning = document.getElementById('desktopWarning');
+                if (warning) {
+                    warning.style.display = 'flex';
+                }
+                if (mainContainer) {
+                    mainContainer.style.display = 'none';
+                }
+                const bottomNav = document.querySelector('.bottom-nav');
+                if (bottomNav) {
+                    bottomNav.style.display = 'none';
+                }
+            }
+        }
+        
+        // 全局变量
+        let tabs = [];
+        let activeTabId = null;
+        let currentPresentationTabId = null;
+        let isDrawing = false;
+        let isBrushActive = false;
+        let isLandscapeMode = false;
+        let canvas, ctx;
+        let lastX = 0;
+        let lastY = 0;
+        let currentVersion = 1.1;
+        
+        // 预设颜色
+        const presetColors = [
+            '#ff0000', '#00ff00', '#0000ff', '#ffff00',
+            '#ff00ff', '#00ffff', '#ffffff', '#000000',
+            '#ff8800', '#8800ff'
+        ];
+        
+        // DOM元素
+        const browserTabs = document.getElementById('browserTabs');
+        const tabsBar = document.getElementById('tabsBar');
+        const tabContentContainer = document.getElementById('tabContentContainer');
+        const noTabsMessage = document.getElementById('noTabsMessage');
+        const createFirstTabBtn = document.getElementById('createFirstTabBtn');
+        
+        // 页面元素
+        const homePage = document.getElementById('homePage');
+        const activityPage = document.getElementById('activityPage');
+        const profilePage = document.getElementById('profilePage');
+        const activityIframe = document.getElementById('activityIframe');
+        
+        // 导航元素
+        const navHome = document.getElementById('navHome');
+        const navActivity = document.getElementById('navActivity');
+        const navProfile = document.getElementById('navProfile');
+        
+        // 放映模式元素
+        const presentationContainer = document.getElementById('presentationContainer');
+        const presentationImage = document.getElementById('presentationImage');
+        const currentImageTitle = document.getElementById('currentImageTitle');
+        const brushToggleBtn = document.getElementById('brushToggleBtn');
+        const landscapeToggleBtn = document.getElementById('landscapeToggleBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const exitPresentationBtn = document.getElementById('exitPresentationBtn');
+        const presentationPrevBtn = document.getElementById('presentationPrevBtn');
+        const presentationNextBtn = document.getElementById('presentationNextBtn');
+        const downloadCurrentBtn = document.getElementById('downloadCurrentBtn');
+        const downloadNavBtn = document.getElementById('downloadNavBtn');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const brushControls = document.getElementById('brushControls');
+        const brushSize = document.getElementById('brushSize');
+        const colorPalette = document.getElementById('colorPalette');
+        const clearCanvas = document.getElementById('clearCanvas');
+        const closeBrushControls = document.getElementById('closeBrushControls');
+        const closePanelBtn = document.getElementById('closePanelBtn');
+        const imageCounter = document.getElementById('imageCounter');
+        
+        // 我的页面元素
+        const checkUpdateItem = document.getElementById('checkUpdateItem');
+        const exitAppItem = document.getElementById('exitAppItem');
+        
+        // 对话框元素
+        const dialogOverlay = document.getElementById('dialogOverlay');
+        const dialogTitle = document.getElementById('dialogTitle');
+        const dialogContent = document.getElementById('dialogContent');
+        const dialogCancel = document.getElementById('dialogCancel');
+        let dialogConfirm = document.getElementById('dialogConfirm');
+        
+        // ==================== 读取文件为Blob ====================
+        function readFileAsBlob(filePath) {
+            return new Promise((resolve, reject) => {
+                if (!window.plus) {
+                    reject(new Error('不在5+环境中'));
+                    return;
+                }
+                
+                console.log('读取文件为Blob，路径:', filePath);
+                
+                // 先尝试使用plus.io.resolveLocalFileSystemURL
+                if (plus.io && plus.io.resolveLocalFileSystemURL) {
+                    console.log('使用plus.io.resolveLocalFileSystemURL');
+                    plus.io.resolveLocalFileSystemURL(filePath, function(entry) {
+                        console.log('文件系统条目解析成功:', entry);
+                        entry.file(function(file) {
+                            console.log('获取文件对象成功:', file);
+                            const reader = new plus.io.FileReader();
+                            reader.onload = function(e) {
+                                console.log('文件读取成功，大小:', e.total);
+                                const arrayBuffer = e.target.result;
+                                const blob = new Blob([arrayBuffer]);
+                                resolve(blob);
+                            };
+                            reader.onerror = function(e) {
+                                console.error('文件读取失败:', e);
+                                reject(new Error('读取文件失败'));
+                            };
+                            reader.readAsArrayBuffer(file);
+                        }, function(e) {
+                            console.error('获取文件对象失败:', e);
+                            reject(new Error('无法获取文件: ' + e.message));
+                        });
+                    }, function(e) {
+                        console.error('解析文件路径失败:', e);
+                        reject(new Error('无法解析文件路径: ' + e.message));
+                    });
+                } else {
+                    console.log('使用fetch备选方案');
+                    // 备选方案：尝试使用fetch
+                    fetch(filePath)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('网络响应错误: ' + response.status);
+                            }
+                            return response.blob();
+                        })
+                        .then(resolve)
+                        .catch(reject);
+                }
+            });
+        }
+        
+        // ==================== 使用5+ API选择文件 ====================
+        function selectFileInHBuilderX(tabId) {
+            console.log('开始5+文件选择流程，标签页:', tabId);
+            
+            // 检查是否在5+APP环境中
+            if (!window.plus) {
+                console.warn('不在5+APP环境中，将使用HTML5方式');
+                fallbackToHTML5FilePicker(tabId);
+                return;
+            }
+            
+            // 显示加载状态
+            const loading = document.getElementById(`loading_${tabId}`);
+            const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+            const fileInfo = document.getElementById(`fileInfo_${tabId}`);
+            
+            if (loading) loading.style.display = 'block';
+            if (uploadSection) uploadSection.style.display = 'none';
+            if (fileInfo) fileInfo.style.display = 'block';
+            
+            // 创建actionSheet让用户选择文件来源
+            if (plus.nativeUI && plus.nativeUI.actionSheet) {
+                plus.nativeUI.actionSheet({
+                    title: "选择文件来源",
+                    cancel: "取消",
+                    buttons: [{title: "从相册选择"}, {title: "从文件管理器选择"}, {title: "拍照"}]
+                }, function(e) {
+                    switch(e.index) {
+                        case 1:
+                            // 从相册选择
+                            if (plus.gallery && plus.gallery.pick) {
+                                console.log('从相册选择');
+                                plus.gallery.pick(function(e) {
+                                    if (e.files && e.files.length > 0) {
+                                        console.log('从相册选择成功:', e.files[0]);
+                                        handleHbxFile(e.files[0], tabId, 'image');
+                                    } else {
+                                        console.log('用户取消选择');
+                                        resetUploadSection(tabId);
+                                    }
+                                }, function(error) {
+                                    console.error('从相册选择失败:', error);
+                                    showDialog('错误', '从相册选择失败');
+                                    resetUploadSection(tabId);
+                                }, {
+                                    filter: "image",
+                                    system: true,
+                                    multiple: false,
+                                    maximum: 1,
+                                    filename: "image/"
+                                });
+                            }
+                            break;
+                            
+                        case 2:
+                            // 从文件管理器选择
+                            console.log('从文件管理器选择');
+                            tryFileChooser(tabId);
+                            break;
+                            
+                        case 3:
+                            // 拍照
+                            if (plus.camera && plus.camera.getCamera) {
+                                console.log('拍照');
+                                const camera = plus.camera.getCamera();
+                                camera.captureImage(function(e) {
+                                    if (e) {
+                                        console.log('拍照成功:', e);
+                                        handleHbxFile(e, tabId, 'image');
+                                    } else {
+                                        console.log('用户取消拍照');
+                                        resetUploadSection(tabId);
+                                    }
+                                }, function(error) {
+                                    console.error('拍照失败:', error);
+                                    showDialog('错误', '拍照失败: ' + (error.message || error));
+                                    resetUploadSection(tabId);
+                                }, {
+                                    filename: "_doc/camera/",
+                                    format: "jpg"
+                                });
+                            }
+                            break;
+                            
+                        default:
+                            // 取消或点击其他区域
+                            console.log('用户取消选择');
+                            resetUploadSection(tabId);
+                            break;
+                    }
+                });
+            } else {
+                // 如果没有actionSheet，直接尝试文件选择器
+                console.log('无actionSheet，直接尝试文件选择器');
+                tryFileChooser(tabId);
+            }
+        }
+        
+        // ==================== 尝试文件选择器 ====================
+        function tryFileChooser(tabId) {
+            console.log('尝试文件选择器');
+            
+            // 首先尝试plus.runtime.openFile
+            if (plus.runtime && plus.runtime.openFile) {
+                console.log('使用plus.runtime.openFile');
+                plus.runtime.openFile({
+                    filter: "*/*"
+                }, function(e) {
+                    if (e && e.file) {
+                        console.log('文件管理器选择成功:', e.file);
+                        handleHbxFile(e.file, tabId, 'file');
+                    } else {
+                        console.log('用户取消选择');
+                        resetUploadSection(tabId);
+                    }
+                });
+            } else if (plus.io && plus.io.pickFile) {
+                // 备选方案：使用plus.io.pickFile
+                console.log('使用plus.io.pickFile');
+                plus.io.pickFile(
+                    function(files) {
+                        if (files && files.length > 0) {
+                            console.log('plus.io.pickFile选择成功:', files[0]);
+                            handleHbxFile(files[0], tabId, 'file');
+                        } else {
+                            console.log('用户取消选择');
+                            resetUploadSection(tabId);
+                        }
+                    },
+                    function(error) {
+                        console.error('plus.io.pickFile选择失败:', error);
+                        showDialog('错误', '文件选择失败: ' + (error.message || '请检查文件访问权限'));
+                        resetUploadSection(tabId);
+                    },
+                    {
+                        title: "选择文件",
+                        filter: "*/*",
+                        multiple: false
+                    }
+                );
+            } else {
+                // 最终回退到HTML5文件选择器
+                console.log('回退到HTML5文件选择器');
+                fallbackToHTML5FilePicker(tabId);
+            }
+        }
+        
+        // ==================== 处理5+选择的文件 ====================
+        function handleHbxFile(filePath, tabId, fileType) {
+            console.log('处理5+文件，路径:', filePath, '类型:', fileType);
+            
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) {
+                console.error('未找到对应的标签页:', tabId);
+                showDialog('错误', '标签页不存在');
+                resetUploadSection(tabId);
+                return;
+            }
+            
+            // 获取相关DOM元素
+            const loading = document.getElementById(`loading_${tabId}`);
+            const previewSection = document.getElementById(`previewSection_${tabId}`);
+            const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+            const fileInfo = document.getElementById(`fileInfo_${tabId}`);
+            const fileName = document.getElementById(`fileName_${tabId}`);
+            const fileSize = document.getElementById(`fileSize_${tabId}`);
+            const fileDetails = document.getElementById(`fileDetails_${tabId}`);
+            
+            // 清理之前的内容
+            if (tab.images && tab.images.length > 0) {
+                tab.images.forEach(img => {
+                    if (img.url && img.url.startsWith('blob:')) {
+                        URL.revokeObjectURL(img.url);
+                    }
+                });
+                tab.images = [];
+            }
+            
+            // 提取文件名
+            const pathParts = filePath.split('/');
+            const displayName = pathParts[pathParts.length - 1] || '未命名文件';
+            
+            // 更新UI显示文件名
+            if (fileName) fileName.textContent = displayName;
+            
+            // 更新标签页名称（截断过长的文件名）
+            const tabItem = document.querySelector(`.tab-item[data-tab-id="${tabId}"] .tab-name`);
+            if (tabItem) {
+                const shortName = displayName.replace(/\.[^/.]+$/, "");
+                tabItem.textContent = shortName.length > 15 ? shortName.substring(0, 15) + '...' : shortName;
+            }
+            
+            // 更新标签页数据
+            tab.name = displayName;
+            tab.fileName = displayName;
+            tab.hasUploaded = false;
+            tab.currentImageIndex = 0;
+            
+            // 显示文件基本信息
+            if (fileSize) fileSize.textContent = ' (大小未知)';
+            if (fileDetails) fileDetails.innerHTML = `<i class="fas fa-info-circle"></i> 正在处理文件...`;
+            
+            // 显示加载状态
+            if (loading) loading.style.display = 'block';
+            if (previewSection) previewSection.style.display = 'none';
+            if (uploadSection) uploadSection.style.display = 'none';
+            if (fileInfo) fileInfo.style.display = 'block';
+            
+            // 根据文件类型处理
+            const isImage = fileType === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(displayName);
+            const isZip = /\.(lsbox|zip)$/i.test(displayName);
+            
+            console.log('文件类型判断:', {isImage, isZip, displayName});
+            
+            if (isImage) {
+                // 对于图片文件，尝试读取为Blob
+                readFileAsBlob(filePath).then(blob => {
+                    if (!blob) {
+                        throw new Error('无法读取文件');
+                    }
+                    
+                    console.log('图片文件读取成功，大小:', blob.size);
+                    const dataUrl = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = function() {
+                        console.log('图片加载成功，尺寸:', img.width, 'x', img.height);
+                        tab.images.push({
+                            name: displayName,
+                            url: dataUrl,
+                            index: 1,
+                            width: img.width,
+                            height: img.height,
+                            size: blob.size,
+                            blob: blob,
+                            dataUrl: dataUrl
+                        });
+                        
+                        completeFileProcessing(tabId, displayName, tab.images.length);
+                    };
+                    img.onerror = function() {
+                        console.error('加载图片失败');
+                        showDialog('错误', '无法加载图片文件');
+                        resetUploadSection(tabId);
+                    };
+                    img.src = dataUrl;
+                }).catch(error => {
+                    console.error('读取图片文件失败:', error);
+                    showDialog('错误', '无法读取图片文件: ' + error.message);
+                    resetUploadSection(tabId);
+                });
+            } else if (isZip) {
+                // 对于ZIP文件，尝试读取为Blob并解压
+                console.log('处理ZIP文件:', displayName);
+                
+                readFileAsBlob(filePath).then(blob => {
+                    if (!blob) {
+                        throw new Error('无法读取ZIP文件');
+                    }
+                    
+                    console.log('ZIP文件读取成功，大小:', blob.size);
+                    return processZipBlob(blob, tabId, displayName);
+                }).then(() => {
+                    completeFileProcessing(tabId, displayName, tab.images.length);
+                }).catch(error => {
+                    console.error('处理ZIP文件失败:', error);
+                    showDialog('错误', '处理ZIP文件失败: ' + error.message);
+                    resetUploadSection(tabId);
+                });
+            } else {
+                // 不支持的文件类型
+                showDialog('错误', '不支持的文件类型，请选择.lsbox文件或图片文件');
+                resetUploadSection(tabId);
+            }
+        }
+        
+        // ==================== 处理ZIP文件的Blob ====================
+        async function processZipBlob(blob, tabId, fileName) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            
+            try {
+                if (typeof JSZip === 'undefined') {
+                    throw new Error('JSZip库未加载，无法解压ZIP文件');
+                }
+                
+                const arrayBuffer = await blob.arrayBuffer();
+                const zip = new JSZip();
+                const zipData = await zip.loadAsync(arrayBuffer);
+                
+                const imageFiles = [];
+                
+                for (const [filename, fileData] of Object.entries(zipData.files)) {
+                    if (!fileData.dir) {
+                        const isImageFile = /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(filename);
+                        if (isImageFile) {
+                            imageFiles.push({
+                                name: filename,
+                                data: fileData
+                            });
+                        }
+                    }
+                }
+                
+                if (imageFiles.length === 0) {
+                    throw new Error('ZIP文件中未找到任何图片文件');
+                }
+                
+                imageFiles.sort((a, b) => {
+                    const numA = extractNumberFromFilename(a.name);
+                    const numB = extractNumberFromFilename(b.name);
+                    return numA - numB;
+                });
+                
+                for (let i = 0; i < imageFiles.length; i++) {
+                    const imageFile = imageFiles[i];
+                    
+                    try {
+                        const blob = await imageFile.data.async('blob');
+                        const dataUrl = URL.createObjectURL(blob);
+                        
+                        const img = new Image();
+                        await new Promise((resolve, reject) => {
+                            img.onload = resolve;
+                            img.onerror = () => reject(new Error(`加载图片失败: ${imageFile.name}`));
+                            img.src = dataUrl;
+                        });
+                        
+                        tab.images.push({
+                            name: imageFile.name,
+                            url: dataUrl,
+                            index: i + 1,
+                            width: img.width,
+                            height: img.height,
+                            size: blob.size,
+                            blob: blob,
+                            dataUrl: dataUrl
+                        });
+                        
+                    } catch (imgError) {
+                        console.error(`处理图片 ${imageFile.name} 时出错:`, imgError);
+                    }
+                }
+                
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        // ==================== 完成文件处理 ====================
+        function completeFileProcessing(tabId, fileName, imageCount) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            
+            const loading = document.getElementById(`loading_${tabId}`);
+            const previewSection = document.getElementById(`previewSection_${tabId}`);
+            const fileDetails = document.getElementById(`fileDetails_${tabId}`);
+            
+            if (loading) loading.style.display = 'none';
+            
+            if (tab.images.length === 0) {
+                showDialog('提示', '文件中未找到图片！');
+                const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+                if (uploadSection) uploadSection.style.display = 'block';
+                return;
+            }
+            
+            tab.hasUploaded = true;
+            if (previewSection) previewSection.style.display = 'block';
+            
+            if (fileDetails) {
+                fileDetails.innerHTML = `
+                    <i class="fas fa-info-circle"></i> 已找到 ${tab.images.length} 张图片
+                    <div style="margin-top: 5px; font-size: 0.85rem; color: #666;">
+                        <i class="fas fa-check-circle"></i> 文件处理成功
+                    </div>
+                `;
+            }
+            
+            displayThumbnails(tabId);
+            initColorPalette();
+            
+            console.log(`标签页 ${tab.name} 成功加载 ${tab.images.length} 张图片`);
+        }
+        
+        // ==================== 重置上传区域 ====================
+        function resetUploadSection(tabId) {
+            const loading = document.getElementById(`loading_${tabId}`);
+            const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+            const fileInfo = document.getElementById(`fileInfo_${tabId}`);
+            
+            if (loading) loading.style.display = 'none';
+            if (uploadSection) uploadSection.style.display = 'block';
+            if (fileInfo) fileInfo.style.display = 'none';
+        }
+        
+        // ==================== 备选：使用HTML5文件选择器 ====================
+        function fallbackToHTML5FilePicker(tabId) {
+            console.log('回退到HTML5文件选择器');
+            
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.lsbox,.zip,.png,.jpg,.jpeg,.gif,.bmp,.webp';
+            input.style.display = 'none';
+            
+            input.onchange = function(e) {
+                if (e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    console.log('HTML5文件选择器选择成功:', file.name);
+                    handleFileUpload(file, tabId);
+                }
+                document.body.removeChild(input);
+            };
+            
+            document.body.appendChild(input);
+            input.click();
+        }
+        
+        // ==================== 辅助函数：读取文件为ArrayBuffer ====================
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    resolve(e.target.result);
+                };
+                reader.onerror = function(e) {
+                    reject(new Error('读取文件失败'));
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        // ==================== 辅助函数：从文件名提取数字 ====================
+        function extractNumberFromFilename(filename) {
+            const matches = filename.match(/(\d+)/);
+            if (matches && matches[1]) {
+                return parseInt(matches[1], 10);
+            }
+            return 0;
+        }
+        
+        // ==================== 生成唯一ID ====================
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+        
+        // ==================== 创建新标签页 ====================
+        function createNewTab(tabName = null) {
+            const tabId = generateId();
+            const tabIndex = tabs.length + 1;
+            const name = tabName || `标签页 ${tabIndex}`;
+            
+            const tab = {
+                id: tabId,
+                name: name,
+                fileName: null,
+                images: [],
+                currentImageIndex: 0,
+                fileInfo: {
+                    name: null,
+                    size: null,
+                    type: null
+                },
+                hasUploaded: false
+            };
+            
+            tabs.push(tab);
+            
+            const tabItem = document.createElement('div');
+            tabItem.className = 'tab-item';
+            tabItem.dataset.tabId = tabId;
+            tabItem.innerHTML = `
+                <div class="tab-name">${name}</div>
+                <div class="tab-close">&times;</div>
+            `;
+            
+            tabItem.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('tab-close')) {
+                    switchTab(tabId);
+                }
+            });
+            
+            const closeBtn = tabItem.querySelector('.tab-close');
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeTab(tabId);
+            });
+            
+            const tabContent = document.createElement('div');
+            tabContent.className = 'tab-preview-container';
+            tabContent.id = `tabContent_${tabId}`;
+            tabContent.innerHTML = `
+                <div class="tab-content-wrapper">
+                    <section class="upload-section" id="uploadSection_${tabId}">
+                        <div class="upload-area" id="uploadArea_${tabId}">
+                            <div class="upload-icon">
+                                <i class="fas fa-file-archive"></i>
+                            </div>
+                            <div class="upload-text">
+                                <h3>上传LSBOX文件</h3>
+                                <p>选择.lsbox文件，其中按顺序显示图片文件课件（1.png, 2.png, ...）</p>
+                                <button class="file-select-btn" id="selectFileBtn_${tabId}">
+                                    <i class="fas fa-folder-open"></i> 选择文件
+                                </button>
+                                <div class="file-info" id="fileInfo_${tabId}">
+                                    <div>
+                                        <i class="fas fa-file-archive file-info-icon"></i>
+                                        <span id="fileName_${tabId}">未选择文件</span>
+                                        <span id="fileSize_${tabId}"></span>
+                                    </div>
+                                    <div id="fileDetails_${tabId}" style="margin-top: 10px; font-size: 0.9rem; color: #666;"></div>
+                                </div>
+                            </div>
+                            <input type="file" id="fileInput_${tabId}" class="file-input" accept=".lsbox,.zip,.png,.jpg,.jpeg,.gif,.bmp,.webp" style="display:none;">
+                        </div>
+                    </section>
+                    
+                    <div class="preview-section" id="previewSection_${tabId}">
+                        <div class="preview-toolbar" id="previewToolbar_${tabId}">
+                            <button class="preview-toolbar-btn" id="prevBtnMain_${tabId}" title="上一张">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="preview-toolbar-btn download" id="downloadBtn_${tabId}" title="下载当前图片">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button class="preview-toolbar-btn presentation" id="startPresentationBtn_${tabId}" title="开始放映">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button class="preview-toolbar-btn" id="nextBtnMain_${tabId}" title="下一张">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="thumbnail-grid" id="thumbnailGrid_${tabId}">
+                            <!-- 缩略图将通过JS动态添加 -->
+                        </div>
+                    </div>
+                    
+                    <div class="loading" id="loading_${tabId}">
+                        <div class="loading-spinner"></div>
+                        <p>正在解压文件并加载图片...</p>
+                    </div>
+                </div>
+            `;
+            
+            tabsBar.appendChild(tabItem);
+            tabContentContainer.appendChild(tabContent);
+            
+            let addTabBtn = document.getElementById('addTabBtn');
+            if (addTabBtn && addTabBtn.parentNode) {
+                tabsBar.removeChild(addTabBtn);
+            }
+            
+            addTabBtn = document.createElement('button');
+            addTabBtn.id = 'addTabBtn';
+            addTabBtn.className = 'add-tab-btn';
+            addTabBtn.innerHTML = '<i class="fas fa-plus"></i>';
+            addTabBtn.addEventListener('click', () => createNewTab());
+            tabsBar.appendChild(addTabBtn);
+            
+            setupTabEvents(tabId);
+            switchTab(tabId);
+            updateTabsDisplay();
+            
+            return tabId;
+        }
+        
+        // ==================== 设置标签页事件 ====================
+        function setupTabEvents(tabId) {
+            const selectFileBtn = document.getElementById(`selectFileBtn_${tabId}`);
+            const fileInput = document.getElementById(`fileInput_${tabId}`);
+            const previewSection = document.getElementById(`previewSection_${tabId}`);
+            const loading = document.getElementById(`loading_${tabId}`);
+            const prevBtnMain = document.getElementById(`prevBtnMain_${tabId}`);
+            const nextBtnMain = document.getElementById(`nextBtnMain_${tabId}`);
+            const startPresentationBtn = document.getElementById(`startPresentationBtn_${tabId}`);
+            const downloadBtn = document.getElementById(`downloadBtn_${tabId}`);
+            const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+            
+            // 设置文件选择按钮事件
+            if (selectFileBtn) {
+                // 根据环境配置按钮
+                if (isHBuilderX()) {
+                    // 5+环境
+                    selectFileBtn.classList.add('hbx-mode');
+                    selectFileBtn.innerHTML = '<i class="fas fa-mobile-alt"></i> 选择文件';
+                    selectFileBtn.addEventListener('click', () => {
+                        console.log('点击5+APP文件选择按钮，标签页:', tabId);
+                        selectFileInHBuilderX(tabId);
+                    });
+                } else {
+                    // 普通浏览器环境
+                    selectFileBtn.innerHTML = '<i class="fas fa-folder-open"></i> 选择文件';
+                    selectFileBtn.addEventListener('click', () => {
+                        console.log('点击普通文件选择按钮');
+                        fileInput.click();
+                    });
+                }
+            }
+            
+            // 设置普通文件上传按钮事件
+            if (fileInput) {
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files.length) {
+                        handleFileUpload(e.target.files[0], tabId);
+                    }
+                });
+            }
+            
+            if (prevBtnMain) {
+                prevBtnMain.addEventListener('click', () => showPreviousImage(tabId));
+            }
+            
+            if (nextBtnMain) {
+                nextBtnMain.addEventListener('click', () => showNextImage(tabId));
+            }
+            
+            if (startPresentationBtn) {
+                startPresentationBtn.addEventListener('click', () => enterPresentationMode(tabId));
+            }
+            
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', () => downloadCurrentImage(tabId));
+            }
+            
+            if (previewSection) {
+                previewSection.style.display = 'none';
+            }
+            
+            if (uploadSection) {
+                uploadSection.style.display = 'block';
+            }
+        }
+        
+        // ==================== 处理文件内容 ====================
+        async function processFileContent(content, tabId, fileName, fileType, file) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            
+            const loading = document.getElementById(`loading_${tabId}`);
+            const previewSection = document.getElementById(`previewSection_${tabId}`);
+            const fileDetails = document.getElementById(`fileDetails_${tabId}`);
+            
+            try {
+                if (fileType === 'image') {
+                    const img = new Image();
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = () => reject(new Error('加载图片失败'));
+                        img.src = content;
+                    });
+                    
+                    tab.images.push({
+                        name: fileName,
+                        url: content,
+                        index: 1,
+                        width: img.width,
+                        height: img.height,
+                        size: file.size,
+                        dataUrl: content
+                    });
+                    
+                } else {
+                    if (typeof JSZip === 'undefined') {
+                        throw new Error('JSZip库未加载，无法解压ZIP文件');
+                    }
+                    
+                    const zip = new JSZip();
+                    const zipData = await zip.loadAsync(content);
+                    
+                    const imageFiles = [];
+                    
+                    for (const [filename, fileData] of Object.entries(zipData.files)) {
+                        if (!fileData.dir) {
+                            const isImageFile = /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(filename);
+                            if (isImageFile) {
+                                imageFiles.push({
+                                    name: filename,
+                                    data: fileData
+                                });
+                            }
+                        }
+                    }
+                    
+                    if (imageFiles.length === 0) {
+                        throw new Error('ZIP文件中未找到任何图片文件');
+                    }
+                    
+                    imageFiles.sort((a, b) => {
+                        const numA = extractNumberFromFilename(a.name);
+                        const numB = extractNumberFromFilename(b.name);
+                        return numA - numB;
+                    });
+                    
+                    for (let i = 0; i < imageFiles.length; i++) {
+                        const imageFile = imageFiles[i];
+                        
+                        try {
+                            const blob = await imageFile.data.async('blob');
+                            const dataUrl = URL.createObjectURL(blob);
+                            
+                            const img = new Image();
+                            await new Promise((resolve, reject) => {
+                                img.onload = resolve;
+                                img.onerror = () => reject(new Error(`加载图片失败: ${imageFile.name}`));
+                                img.src = dataUrl;
+                            });
+                            
+                            tab.images.push({
+                                name: imageFile.name,
+                                url: dataUrl,
+                                index: i + 1,
+                                width: img.width,
+                                height: img.height,
+                                size: blob.size,
+                                blob: blob,
+                                dataUrl: dataUrl
+                            });
+                            
+                        } catch (imgError) {
+                            console.error(`处理图片 ${imageFile.name} 时出错:`, imgError);
+                        }
+                    }
+                }
+                
+                if (loading) loading.style.display = 'none';
+                
+                console.log('处理完成，总共加载图片数:', tab.images.length);
+                
+                if (tab.images.length === 0) {
+                    showDialog('提示', '文件中未找到图片！');
+                    const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+                    if (uploadSection) uploadSection.style.display = 'block';
+                    return;
+                }
+                
+                tab.hasUploaded = true;
+                if (previewSection) previewSection.style.display = 'block';
+                
+                if (fileDetails) {
+                    fileDetails.innerHTML = `
+                        <i class="fas fa-info-circle"></i> 已找到 ${tab.images.length} 张图片
+                        <div style="margin-top: 5px; font-size: 0.85rem; color: #666;">
+                            <i class="fas fa-check-circle"></i> 文件处理成功
+                        </div>
+                    `;
+                }
+                
+                displayThumbnails(tabId);
+                initColorPalette();
+                
+                console.log(`标签页 ${tab.name} 成功加载 ${tab.images.length} 张图片`);
+                
+            } catch (error) {
+                console.error('处理文件内容时出错:', error);
+                showDialog('错误', '无法处理文件内容: ' + error.message);
+                if (loading) loading.style.display = 'none';
+                const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+                if (uploadSection) uploadSection.style.display = 'block';
+            }
+        }
+        
+        // ==================== 处理文件上传 ====================
+        async function handleFileUpload(file, tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            
+            const fileInfo = document.getElementById(`fileInfo_${tabId}`);
+            const fileName = document.getElementById(`fileName_${tabId}`);
+            const fileSize = document.getElementById(`fileSize_${tabId}`);
+            const fileDetails = document.getElementById(`fileDetails_${tabId}`);
+            
+            if (fileInfo) fileInfo.style.display = 'block';
+            if (fileName) fileName.textContent = file.name;
+            if (fileSize) fileSize.textContent = ` (${formatFileSize(file.size)})`;
+            if (fileDetails) fileDetails.innerHTML = `<i class="fas fa-info-circle"></i> 文件类型: ${file.type || '未知'}`;
+            
+            const tabItem = document.querySelector(`.tab-item[data-tab-id="${tabId}"] .tab-name`);
+            if (tabItem) {
+                const displayName = file.name.replace(/\.[^/.]+$/, "");
+                tabItem.textContent = displayName.length > 15 ? displayName.substring(0, 15) + '...' : displayName;
+            }
+            
+            tab.name = file.name;
+            tab.fileName = file.name;
+            tab.fileInfo = {
+                name: file.name,
+                size: file.size,
+                type: file.type || '未知'
+            };
+            
+            const loading = document.getElementById(`loading_${tabId}`);
+            const previewSection = document.getElementById(`previewSection_${tabId}`);
+            const uploadSection = document.getElementById(`uploadSection_${tabId}`);
+            
+            if (loading) loading.style.display = 'block';
+            if (previewSection) previewSection.style.display = 'none';
+            if (uploadSection) uploadSection.style.display = 'none';
+            
+            try {
+                if (tab.images && tab.images.length > 0) {
+                    tab.images.forEach(img => {
+                        if (img.url) URL.revokeObjectURL(img.url);
+                    });
+                    tab.images = [];
+                }
+                
+                const isZipFile = file.type === 'application/zip' || 
+                                 file.name.toLowerCase().endsWith('.lsbox') || 
+                                 file.name.toLowerCase().endsWith('.zip') ||
+                                 (file.name && /\.lsbox$/i.test(file.name));
+                
+                console.log('文件信息:', {
+                    name: file.name,
+                    type: file.type,
+                    isZipFile: isZipFile,
+                    size: file.size
+                });
+                
+                if (isZipFile) {
+                    console.log('开始处理ZIP文件...');
+                    
+                    try {
+                        if (typeof JSZip === 'undefined') {
+                            throw new Error('JSZip库未加载，无法解压ZIP文件');
+                        }
+                        
+                        const arrayBuffer = await readFileAsArrayBuffer(file);
+                        console.log('文件读取完成，大小:', arrayBuffer.byteLength, '字节');
+                        
+                        const zip = new JSZip();
+                        const zipData = await zip.loadAsync(arrayBuffer);
+                        console.log('ZIP文件加载成功，包含文件数:', Object.keys(zipData.files).length);
+                        
+                        const imageFiles = [];
+                        
+                        for (const [filename, fileData] of Object.entries(zipData.files)) {
+                            if (!fileData.dir) {
+                                const isImageFile = /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(filename);
+                                if (isImageFile) {
+                                    console.log('找到图片文件:', filename);
+                                    imageFiles.push({
+                                        name: filename,
+                                        data: fileData
+                                    });
+                                }
+                            }
+                        }
+                        
+                        console.log('总共找到图片文件数量:', imageFiles.length);
+                        
+                        if (imageFiles.length === 0) {
+                            throw new Error('ZIP文件中未找到任何图片文件');
+                        }
+                        
+                        imageFiles.sort((a, b) => {
+                            const numA = extractNumberFromFilename(a.name);
+                            const numB = extractNumberFromFilename(b.name);
+                            return numA - numB;
+                        });
+                        
+                        console.log('图片排序完成:', imageFiles.map(img => img.name));
+                        
+                        for (let i = 0; i < imageFiles.length; i++) {
+                            const imageFile = imageFiles[i];
+                            console.log(`处理第 ${i + 1} 张图片:`, imageFile.name);
+                            
+                            try {
+                                const blob = await imageFile.data.async('blob');
+                                const dataUrl = URL.createObjectURL(blob);
+                                
+                                const img = new Image();
+                                await new Promise((resolve, reject) => {
+                                    img.onload = resolve;
+                                    img.onerror = () => reject(new Error(`加载图片失败: ${imageFile.name}`));
+                                    img.src = dataUrl;
+                                });
+                                
+                                tab.images.push({
+                                    name: imageFile.name,
+                                    url: dataUrl,
+                                    index: i + 1,
+                                    width: img.width,
+                                    height: img.height,
+                                    size: blob.size,
+                                    blob: blob,
+                                    dataUrl: dataUrl
+                                });
+                                
+                                console.log(`图片 ${imageFile.name} 加载成功，尺寸: ${img.width}x${img.height}`);
+                            } catch (imgError) {
+                                console.error(`处理图片 ${imageFile.name} 时出错:`, imgError);
+                            }
+                        }
+                        
+                    } catch (zipError) {
+                        console.error('处理ZIP文件时出错:', zipError);
+                        throw new Error(`处理ZIP文件失败: ${zipError.message}`);
+                    }
+                    
+                } else if (/\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(file.name)) {
+                    console.log('处理单个图片文件:', file.name);
+                    
+                    const dataUrl = URL.createObjectURL(file);
+                    
+                    const img = new Image();
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = () => reject(new Error('加载图片失败'));
+                        img.src = dataUrl;
+                    });
+                    
+                    tab.images.push({
+                        name: file.name,
+                        url: dataUrl,
+                        index: 1,
+                        width: img.width,
+                        height: img.height,
+                        size: file.size,
+                        blob: file,
+                        dataUrl: dataUrl
+                    });
+                    
+                    console.log('单个图片加载成功，尺寸:', img.width, 'x', img.height);
+                } else {
+                    throw new Error('不支持的文件类型，请上传.lsbox(ZIP)文件或图片文件');
+                }
+                
+                if (loading) loading.style.display = 'none';
+                
+                console.log('处理完成，总共加载图片数:', tab.images.length);
+                
+                if (tab.images.length === 0) {
+                    showDialog('提示', '文件中未找到图片！');
+                    if (uploadSection) uploadSection.style.display = 'block';
+                    return;
+                }
+                
+                tab.hasUploaded = true;
+                if (previewSection) previewSection.style.display = 'block';
+                
+                if (fileDetails) {
+                    fileDetails.innerHTML = `
+                        <i class="fas fa-info-circle"></i> 已找到 ${tab.images.length} 张图片
+                        <div style="margin-top: 5px; font-size: 0.85rem; color: #666;">
+                            <i class="fas fa-check-circle"></i> 文件处理成功
+                        </div>
+                    `;
+                }
+                
+                displayThumbnails(tabId);
+                initColorPalette();
+                
+                console.log(`标签页 ${tab.name} 成功加载 ${tab.images.length} 张图片`);
+                
+            } catch (error) {
+                console.error('处理文件时出错:', error);
+                showDialog('错误', '无法处理文件: ' + error.message);
+                if (loading) loading.style.display = 'none';
+                if (uploadSection) uploadSection.style.display = 'block';
+                if (fileDetails) {
+                    fileDetails.innerHTML = `<i class="fas fa-exclamation-triangle"></i> 文件处理失败: ${error.message}`;
+                }
+            }
+        }
+        
+        // ==================== 切换到指定标签页 ====================
+        function switchTab(tabId) {
+            activeTabId = tabId;
+            
+            document.querySelectorAll('.tab-item').forEach(item => {
+                if (item.dataset.tabId === tabId) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            
+            document.querySelectorAll('.tab-preview-container').forEach(content => {
+                if (content.id === `tabContent_${tabId}`) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+        }
+        
+        // ==================== 关闭标签页 ====================
+        function closeTab(tabId) {
+            if (tabs.length <= 1) {
+                showDialog('提示', '至少需要保留一个标签页');
+                return;
+            }
+            
+            if (currentPresentationTabId === tabId && presentationContainer && presentationContainer.style.display === 'flex') {
+                exitPresentationMode();
+            }
+            
+            const tab = tabs.find(t => t.id === tabId);
+            if (tab && tab.images) {
+                tab.images.forEach(img => {
+                    if (img.url) URL.revokeObjectURL(img.url);
+                });
+            }
+            
+            tabs = tabs.filter(t => t.id !== tabId);
+            
+            const tabItem = document.querySelector(`.tab-item[data-tab-id="${tabId}"]`);
+            const tabContent = document.getElementById(`tabContent_${tabId}`);
+            
+            if (tabItem) tabItem.remove();
+            if (tabContent) tabContent.remove();
+            
+            if (activeTabId === tabId && tabs.length > 0) {
+                const remainingTab = tabs[0];
+                switchTab(remainingTab.id);
+            }
+            
+            updateTabsDisplay();
+        }
+        
+        // ==================== 更新标签页显示 ====================
+        function updateTabsDisplay() {
+            if (browserTabs && noTabsMessage) {
+                if (tabs.length === 0) {
+                    browserTabs.style.display = 'none';
+                    noTabsMessage.style.display = 'block';
+                } else {
+                    browserTabs.style.display = 'block';
+                    noTabsMessage.style.display = 'none';
+                }
+            }
+        }
+        
+        // ==================== 显示缩略图 ====================
+        function displayThumbnails(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            
+            const thumbnailGrid = document.getElementById(`thumbnailGrid_${tabId}`);
+            if (!thumbnailGrid) return;
+            
+            thumbnailGrid.innerHTML = '';
+            
+            tab.images.forEach((image, index) => {
+                const thumbnailItem = document.createElement('div');
+                thumbnailItem.className = 'thumbnail-item';
+                if (index === tab.currentImageIndex) thumbnailItem.classList.add('active');
+                
+                thumbnailItem.innerHTML = `
+                    <div class="thumbnail-img-container">
+                        <img src="${image.url}" alt="${image.name}" loading="lazy">
+                    </div>
+                    <div class="thumbnail-index">图片 ${image.index}</div>
+                `;
+                
+                thumbnailItem.addEventListener('click', () => {
+                    tab.currentImageIndex = index;
+                    updateThumbnailSelection(tabId);
+                });
+                
+                thumbnailGrid.appendChild(thumbnailItem);
+            });
+        }
+        
+        // ==================== 更新缩略图选中状态 ====================
+        function updateThumbnailSelection(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            
+            const thumbnailItems = document.querySelectorAll(`#thumbnailGrid_${tabId} .thumbnail-item`);
+            thumbnailItems.forEach((item, index) => {
+                if (index === tab.currentImageIndex) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+        
+        // ==================== 进入放映模式 ====================
+        function enterPresentationMode(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab || tab.images.length === 0) {
+                showDialog('提示', '请先上传包含图片的文件');
+                return;
+            }
+            
+            currentPresentationTabId = tabId;
+            isLandscapeMode = false;
+            if (presentationImage) presentationImage.classList.remove('landscape');
+            if (landscapeToggleBtn) landscapeToggleBtn.classList.remove('active');
+            
+            if (presentationContainer) presentationContainer.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            isBrushActive = false;
+            if (brushToggleBtn) brushToggleBtn.classList.remove('active');
+            if (canvasContainer) canvasContainer.style.display = 'none';
+            if (brushControls) brushControls.style.display = 'none';
+            
+            initDrawingCanvas();
+            updatePresentationImage();
+        }
+        
+        // ==================== 退出放映模式 ====================
+        function exitPresentationMode() {
+            if (presentationContainer) presentationContainer.style.display = 'none';
+            document.body.style.overflow = 'auto';
+            
+            isBrushActive = false;
+            if (brushToggleBtn) brushToggleBtn.classList.remove('active');
+            
+            if (canvas && ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+        
+        // ==================== 切换横屏显示 ====================
+        function toggleLandscapeMode() {
+            isLandscapeMode = !isLandscapeMode;
+            
+            if (presentationImage && landscapeToggleBtn) {
+                if (isLandscapeMode) {
+                    presentationImage.classList.add('landscape');
+                    landscapeToggleBtn.classList.add('active');
+                } else {
+                    presentationImage.classList.remove('landscape');
+                    landscapeToggleBtn.classList.remove('active');
+                }
+            }
+        }
+        
+        // ==================== 切换画笔工具 ====================
+        function toggleBrush() {
+            isBrushActive = !isBrushActive;
+            
+            if (isBrushActive) {
+                if (brushToggleBtn) brushToggleBtn.classList.add('active');
+                if (canvasContainer) canvasContainer.style.display = 'block';
+                if (brushControls) brushControls.style.display = 'flex';
+                enableCanvasEvents();
+            } else {
+                if (brushToggleBtn) brushToggleBtn.classList.remove('active');
+                if (canvasContainer) canvasContainer.style.display = 'none';
+                if (brushControls) brushControls.style.display = 'none';
+                disableCanvasEvents();
+            }
+        }
+        
+        // ==================== 显示上一张图片 ====================
+        function showPreviousImage(tabId = null) {
+            const tab = tabId ? tabs.find(t => t.id === tabId) : (currentPresentationTabId ? tabs.find(t => t.id === currentPresentationTabId) : getActiveTab());
+            if (!tab || tab.images.length === 0) return;
+            
+            tab.currentImageIndex = (tab.currentImageIndex - 1 + tab.images.length) % tab.images.length;
+            
+            if (tabId) {
+                updateThumbnailSelection(tabId);
+            }
+            
+            if (presentationContainer && presentationContainer.style.display === 'flex') {
+                updatePresentationImage();
+            }
+        }
+        
+        // ==================== 显示下一张图片 ====================
+        function showNextImage(tabId = null) {
+            const tab = tabId ? tabs.find(t => t.id === tabId) : (currentPresentationTabId ? tabs.find(t => t.id === currentPresentationTabId) : getActiveTab());
+            if (!tab || tab.images.length === 0) return;
+            
+            tab.currentImageIndex = (tab.currentImageIndex + 1) % tab.images.length;
+            
+            if (tabId) {
+                updateThumbnailSelection(tabId);
+            }
+            
+            if (presentationContainer && presentationContainer.style.display === 'flex') {
+                updatePresentationImage();
+            }
+        }
+        
+        // ==================== 获取活动标签页 ====================
+        function getActiveTab() {
+            return tabs.find(t => t.id === activeTabId);
+        }
+        
+        // ==================== 更新放映图片 ====================
+        function updatePresentationImage() {
+            const tab = tabs.find(t => t.id === currentPresentationTabId);
+            if (!tab || tab.images.length === 0) return;
+            
+            const image = tab.images[tab.currentImageIndex];
+            if (presentationImage) presentationImage.src = image.url;
+            if (currentImageTitle) currentImageTitle.textContent = `图片 ${image.index}`;
+            if (imageCounter) imageCounter.textContent = `${tab.currentImageIndex + 1} / ${tab.images.length}`;
+            
+            if (canvas && ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+        
+        // ==================== 下载当前图片 ====================
+        async function downloadCurrentImage(tabId = null) {
+            const tab = tabId ? tabs.find(t => t.id === tabId) : (currentPresentationTabId ? tabs.find(t => t.id === currentPresentationTabId) : getActiveTab());
+            if (!tab || tab.images.length === 0) {
+                showDialog('提示', '没有可下载的图片');
+                return;
+            }
+            
+            const image = tab.images[tab.currentImageIndex];
+            
+            try {
+                if (isHBuilderX()) {
+                    showDialog('下载中', '正在保存图片...');
+                    
+                    // 简化的5+下载逻辑
+                    if (plus.gallery && plus.gallery.save) {
+                        const bitmap = new plus.nativeObj.Bitmap();
+                        if (image.dataUrl && image.dataUrl.startsWith('data:')) {
+                            const base64Data = image.dataUrl.split(',')[1];
+                            bitmap.loadBase64Data(base64Data, function() {
+                                plus.gallery.save(bitmap, function() {
+                                    bitmap.clear();
+                                    showDialog('下载成功', '图片已保存到相册');
+                                }, function(e) {
+                                    bitmap.clear();
+                                    console.error('保存到相册失败:', e.message);
+                                    fallbackToStandardDownload(image);
+                                });
+                            }, function(e) {
+                                bitmap.clear();
+                                console.error('加载图片数据失败:', e.message);
+                                fallbackToStandardDownload(image);
+                            });
+                        } else {
+                            fallbackToStandardDownload(image);
+                        }
+                    } else {
+                        fallbackToStandardDownload(image);
+                    }
+                } else {
+                    fallbackToStandardDownload(image);
+                }
+                
+            } catch (error) {
+                console.error('下载图片时出错:', error);
+                showDialog('下载失败', `无法下载图片: ${error.message}`);
+            }
+        }
+        
+        // ==================== 标准下载方法 ====================
+        function fallbackToStandardDownload(image) {
+            let url = null;
+            let fileName = image.name || `image_${image.index}.png`;
+            
+            if (image.blob) {
+                url = URL.createObjectURL(image.blob);
+            } else if (image.dataUrl) {
+                url = image.dataUrl;
+            } else if (image.url) {
+                url = image.url;
+            }
+            
+            if (!url) {
+                showDialog('提示', '无法下载该图片');
+                return;
+            }
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            if (url.startsWith('blob:')) {
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            }
+            
+            showDialog('下载成功', `图片 ${fileName} 已开始下载`);
+        }
+        
+        // ==================== 初始化颜色选择器 ====================
+        function initColorPalette() {
+            if (!colorPalette) return;
+            
+            colorPalette.innerHTML = '';
+            
+            presetColors.forEach(color => {
+                const colorOption = document.createElement('div');
+                colorOption.className = 'color-option';
+                colorOption.style.backgroundColor = color;
+                
+                if (color === '#ff0000') {
+                    colorOption.classList.add('selected');
+                }
+                
+                colorOption.addEventListener('click', () => {
+                    document.querySelectorAll('.color-option').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    
+                    colorOption.classList.add('selected');
+                    
+                    if (ctx) {
+                        ctx.strokeStyle = color;
+                    }
+                });
+                
+                colorPalette.appendChild(colorOption);
+            });
+        }
+        
+        // ==================== 初始化画布 ====================
+        function initDrawingCanvas() {
+            canvas = document.getElementById('drawingCanvas');
+            if (!canvas) return;
+            
+            ctx = canvas.getContext('2d');
+            
+            const container = document.querySelector('.presentation-body');
+            if (container) {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            }
+            
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = brushSize ? brushSize.value : 5;
+            
+            if (brushSize) {
+                brushSize.addEventListener('input', () => {
+                    ctx.lineWidth = brushSize.value;
+                });
+            }
+        }
+        
+        // ==================== 启用画布事件 ====================
+        function enableCanvasEvents() {
+            if (!canvas) return;
+            
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', startDrawingTouch);
+            canvas.addEventListener('touchmove', drawTouch);
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+        
+        // ==================== 禁用画布事件 ====================
+        function disableCanvasEvents() {
+            if (!canvas) return;
+            
+            canvas.removeEventListener('mousedown', startDrawing);
+            canvas.removeEventListener('mousemove', draw);
+            canvas.removeEventListener('mouseup', stopDrawing);
+            canvas.removeEventListener('mouseout', stopDrawing);
+            canvas.removeEventListener('touchstart', startDrawingTouch);
+            canvas.removeEventListener('touchmove', drawTouch);
+            canvas.removeEventListener('touchend', stopDrawing);
+        }
+        
+        // ==================== 开始绘制（鼠标） ====================
+        function startDrawing(e) {
+            if (!isBrushActive) return;
+            
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            lastX = e.clientX - rect.left;
+            lastY = e.clientY - rect.top;
+        }
+        
+        // ==================== 开始绘制（触摸） ====================
+        function startDrawingTouch(e) {
+            if (!isBrushActive) return;
+            
+            e.preventDefault();
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            lastX = touch.clientX - rect.left;
+            lastY = touch.clientY - rect.top;
+        }
+        
+        // ==================== 绘制（鼠标） ====================
+        function draw(e) {
+            if (!isBrushActive || !isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            
+            lastX = x;
+            lastY = y;
+        }
+        
+        // ==================== 绘制（触摸） ====================
+        function drawTouch(e) {
+            if (!isBrushActive || !isDrawing) return;
+            
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            
+            lastX = x;
+            lastY = y;
+        }
+        
+        // ==================== 停止绘制 ====================
+        function stopDrawing() {
+            isDrawing = false;
+        }
+        
+        // ==================== 清除画布 ====================
+        function clearDrawingCanvas() {
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+        
+        // ==================== 格式化文件大小 ====================
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // ==================== 显示对话框 ====================
+        function showDialog(title, content, onConfirm = null) {
+            if (!dialogTitle || !dialogContent || !dialogOverlay) return;
+            
+            dialogTitle.textContent = title;
+            dialogContent.textContent = content;
+            dialogOverlay.style.display = 'flex';
+            
+            const newConfirmBtn = dialogConfirm.cloneNode(true);
+            dialogConfirm.parentNode.replaceChild(newConfirmBtn, dialogConfirm);
+            dialogConfirm = newConfirmBtn;
+            
+            if (onConfirm) {
+                dialogConfirm.addEventListener('click', () => {
+                    dialogOverlay.style.display = 'none';
+                    onConfirm();
+                });
+            } else {
+                dialogConfirm.addEventListener('click', () => {
+                    dialogOverlay.style.display = 'none';
+                });
+            }
+        }
+        
+        // ==================== 检查更新 ====================
+        async function checkForUpdate() {
+            showDialog('检查更新', '正在检查更新...');
+            
+            try {
+                const response = await fetch('https://longsstudio.github.io/zhbbaz.txt');
+                if (!response.ok) {
+                    throw new Error('无法获取版本信息');
+                }
+                
+                const remoteVersionText = await response.text();
+                const remoteVersion = parseFloat(remoteVersionText.trim());
+                
+                if (isNaN(remoteVersion)) {
+                    throw new Error('版本信息格式错误');
+                }
+                
+                if (remoteVersion > currentVersion) {
+                    showDialog('发现新版本', `发现新版本 ${remoteVersion}，当前版本 ${currentVersion}，是否前往下载？`, () => {
+                        window.location.href = 'https://longsstudio.github.io/zhbbxz.html';
+                    });
+                } else {
+                    showDialog('检查更新', `当前已是最新版本 ${currentVersion}`);
+                }
+                
+            } catch (error) {
+                console.error('检查更新失败:', error);
+                showDialog('检查更新失败', '无法连接到更新服务器，请检查网络连接。');
+            }
+        }
+        
+        // ==================== 显示退出对话框 ====================
+        function showExitDialog() {
+            showDialog('退出软件', '确定要退出应用程序吗？', () => {
+                if (isHBuilderX() && window.plus && plus.runtime) {
+                    plus.runtime.quit();
+                } else if (window.close) {
+                    window.close();
+                } else {
+                    showDialog('提示', '请手动关闭浏览器或标签页。');
+                }
+            });
+        }
+        
+        // ==================== 页面切换函数 ====================
+        function switchPage(page) {
+            if (homePage) homePage.classList.remove('active');
+            if (activityPage) activityPage.classList.remove('active');
+            if (profilePage) profilePage.classList.remove('active');
+            
+            if (navHome) navHome.classList.remove('active');
+            if (navActivity) navActivity.classList.remove('active');
+            if (navProfile) navProfile.classList.remove('active');
+            
+            const appTitle = document.getElementById('appTitle');
+            
+            switch(page) {
+                case 'home':
+                    if (homePage) homePage.classList.add('active');
+                    if (navHome) navHome.classList.add('active');
+                    if (appTitle) appTitle.textContent = '智慧白板';
+                    break;
+                case 'activity':
+                    if (activityPage) activityPage.classList.add('active');
+                    if (navActivity) navActivity.classList.add('active');
+                    if (appTitle) appTitle.textContent = '活动';
+                    if (activityIframe && (!activityIframe.src || activityIframe.src === 'about:blank')) {
+                        activityIframe.src = 'https://longsstudio.github.io/hd.html';
+                    }
+                    break;
+                case 'profile':
+                    if (profilePage) profilePage.classList.add('active');
+                    if (navProfile) navProfile.classList.add('active');
+                    if (appTitle) appTitle.textContent = '我的';
+                    break;
+            }
+        }
+        
+        // ==================== 事件监听器 ====================
+        if (createFirstTabBtn) {
+            createFirstTabBtn.addEventListener('click', () => createNewTab());
+        }
+        
+        if (navHome) {
+            navHome.addEventListener('click', () => switchPage('home'));
+        }
+        
+        if (navActivity) {
+            navActivity.addEventListener('click', () => switchPage('activity'));
+        }
+        
+        if (navProfile) {
+            navProfile.addEventListener('click', () => switchPage('profile'));
+        }
+        
+        // 放映模式事件
+        if (brushToggleBtn) {
+            brushToggleBtn.addEventListener('click', toggleBrush);
+        }
+        
+        if (landscapeToggleBtn) {
+            landscapeToggleBtn.addEventListener('click', toggleLandscapeMode);
+        }
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => showPreviousImage());
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => showNextImage());
+        }
+        
+        if (exitPresentationBtn) {
+            exitPresentationBtn.addEventListener('click', exitPresentationMode);
+        }
+        
+        if (presentationPrevBtn) {
+            presentationPrevBtn.addEventListener('click', () => showPreviousImage());
+        }
+        
+        if (presentationNextBtn) {
+            presentationNextBtn.addEventListener('click', () => showNextImage());
+        }
+        
+        if (downloadCurrentBtn) {
+            downloadCurrentBtn.addEventListener('click', () => downloadCurrentImage());
+        }
+        
+        if (downloadNavBtn) {
+            downloadNavBtn.addEventListener('click', () => downloadCurrentImage());
+        }
+        
+        if (clearCanvas) {
+            clearCanvas.addEventListener('click', clearDrawingCanvas);
+        }
+        
+        if (closeBrushControls) {
+            closeBrushControls.addEventListener('click', () => {
+                if (brushControls) brushControls.style.display = 'none';
+            });
+        }
+        
+        if (closePanelBtn) {
+            closePanelBtn.addEventListener('click', () => {
+                if (brushControls) brushControls.style.display = 'none';
+            });
+        }
+        
+        // 我的页面事件
+        if (checkUpdateItem) {
+            checkUpdateItem.addEventListener('click', checkForUpdate);
+        }
+        
+        if (exitAppItem) {
+            exitAppItem.addEventListener('click', showExitDialog);
+        }
+        
+        // 对话框事件
+        if (dialogCancel) {
+            dialogCancel.addEventListener('click', () => {
+                if (dialogOverlay) dialogOverlay.style.display = 'none';
+            });
+        }
+        
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('智慧白板应用已加载');
+            
+            if (isHBuilderX()) {
+                console.log('运行在HBuilderX 5+APP环境中');
+                setTimeout(() => {
+                    showDialog('环境检测', '检测到您正在使用5+APP环境，已启用5+专用文件选择器。');
+                }, 2000);
+            } else {
+                console.log('运行在普通浏览器环境中');
+            }
+            
+            switchPage('home');
+            createNewTab();
+            
+            const appVersion = document.getElementById('appVersion');
+            if (appVersion) {
+                appVersion.textContent = `版本 ${currentVersion}`;
+            }
+            
+            setTimeout(() => {
+                hideSplashScreen();
+            }, 1500);
+        });
+        
+        // 窗口大小变化时调整画布
+        window.addEventListener('resize', () => {
+            if (presentationContainer && presentationContainer.style.display === 'flex' && canvas) {
+                const container = document.querySelector('.presentation-body');
+                if (container) {
+                    canvas.width = container.clientWidth;
+                    canvas.height = container.clientHeight;
+                }
+            }
+        });
+        
+        // 添加错误处理
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript错误:', e.message, '在', e.filename, ':', e.lineno);
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('未处理的Promise拒绝:', e.reason);
+        });
+    </script>
+</body>
+</html>
